@@ -1,0 +1,64 @@
+Ruolo: Lead Web Designer & Full-Stack Developer.
+Obiettivo: rendere production-ready e performante il sito EasyRealEstate Garda Lake (mobile-first, accessibile, scalabile).
+Link Stripe (Payment Links):
+- Basic 5€/mese: https://buy.stripe.com/aFa3co0111xTgQOeAE7g408
+- Premium 100€/mese: https://buy.stripe.com/14A6oAdRR3G16ca3W07g40a
+- Chat singola 30€: https://buy.stripe.com/8x214g7tt1xTeIGeAE7g407
+- Pubblica annuncio 50€: https://buy.stripe.com/00weV64hhb8tbwubos7g405
+Deliverable: frontend (Next.js o static HTML ottimizzato) + backend (FastAPI o Express) + Postgres + Redis + docker-compose + nginx.
+UX essenziali: header sticky con logo=tasto Home, contatore visitatori top-right, hero LCP-first, ricerca/proprietà/annuncio/dashboard, sitemap, robots.
+Performance: LCP < 2.5s, preload LCP image & fonts, WebP/AVIF, critical CSS inline, lazy-load, bundle splitting.
+Accessibilità & SEO: WCAG AA, aria landmarks, focus-visible, JSON-LD (RealEstateAgent/Offer), URL parlanti.
+Pagamenti: usare i link Stripe forniti in popup; webhook idempotente (Redis lock); regole: Basic 5€/mese (può comprare Publish 50€ e Chat 30€), Premium 100€/mese illimitato.
+API essenziali: POST /api/auth, POST /api/auth/login, GET /api/properties, GET /api/properties/{id}, POST /api/properties, POST /api/checkout, POST /api/webhook/stripe, POST /api/metrics/visit, GET /api/metrics/visitors.
+Test & CI: 5 e2e (Cypress), 5 unit (pytest/jest), Lighthouse CI. GH Actions build→test→e2e→lighthouse.
+Security & deploy: SSL (Certbot), CSP, HSTS, rate limiting, env secrets, daily DB backup, Sentry.
+Acceptance: LCP<2.5s, Lighthouse accessibility>=90, webhook testato in staging, contatore visitatori non conteggia reload ripetuti entro 24h, cookie banner GDPR.
+DB snippet (incluso): 
+
+-- SQL DDL minimo (Postgres)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  name TEXT,
+  stripe_customer_id TEXT,
+  role TEXT DEFAULT 'visitor',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  plan TEXT,
+  status TEXT,
+  current_period_end TIMESTAMPTZ
+);
+CREATE TABLE properties (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  title TEXT,
+  description TEXT,
+  price NUMERIC(10,2),
+  city TEXT,
+  sqm INT,
+  rooms INT,
+  lat DOUBLE PRECISION,
+  lon DOUBLE PRECISION,
+  images JSONB DEFAULT '[]',
+  status TEXT DEFAULT 'draft',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  property_id UUID,
+  type TEXT,
+  amount NUMERIC(10,2),
+  stripe_payment_id TEXT,
+  status TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX idx_properties_city_price ON properties (city, price);
+CREATE INDEX idx_properties_ft ON properties USING gin(to_tsvector('italian', coalesce(title,'') || ' ' || coalesce(description,'')));
+Output richiesto: PR nel branch manus/improve-site con migration SQL, docker-compose.prod.yml, nginx.conf, webhook skeleton, test skeleton e screenshot Lighthouse.
